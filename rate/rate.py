@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import math
 
 from settings import *
 from team import Team
@@ -43,16 +44,14 @@ def run_history():
     path = "../data/RegularSeasonDetailedResults.csv"
     complete_history = pd.read_csv(path)
 
-    # print headers
-    print(list(complete_history))
-
     # get season list
     cols = ['Day', 'WLM Error', 'Elo Error', 'Dim Error', 'MOV Error', 'DimV Error']
     all_errors = pd.DataFrame(columns=cols)
+    all_ratings = pd.DataFrame(columns=['Season', 'TID', 'Rating'])
     seasons = list(complete_history['Season'].unique())
     for season in seasons:
         # testing purposes
-        # if season != 2018:
+        # if season != 2017:
         #     continue
 
         # get season df
@@ -112,20 +111,38 @@ def run_history():
         s_error_df = pd.DataFrame(avg_errors, columns=cols)
         all_errors = pd.concat([all_errors,s_error_df])
 
+        dimv_ratings = []
+        for team in list(team_directory.values()):
+            dimv_ratings.append([season,team.tid,team.dimv])
+        ratings_df = pd.DataFrame(dimv_ratings,columns=['Season', 'TID', 'Rating'])
+        ratings_df = ratings_df.sort_values(by='Rating', ascending=False)
+        all_ratings = pd.concat([all_ratings, ratings_df])
+
     print(all_errors.tail())
     all_errors.to_csv('sub_errors.csv')
 
-    # dim_ratings = []
-    # for team in list(team_directory.values()):
-    #     dim_ratings.append([team.tid,team.dim])
-    # ratings_df = pd.DataFrame(dim_ratings,columns=['TID', 'DimK Rating'])
-    # ratings_df = ratings_df.sort_values(by='DimK Rating', ascending=False)
-    # print(ratings_df)
+    print(all_ratings)
+    all_ratings.to_csv('rate.csv')
 
     return
 
 
+def create_submission():
+    sub_df = pd.read_csv('../data/SampleSubmissionStage1.csv')
+    ratings = pd.read_csv('rate.csv')
 
+    sub_df['Season'] = sub_df['ID'].map(lambda x: int(x.split('_')[0]))
+    sub_df['Team1'] = sub_df['ID'].map(lambda x: int(x.split('_')[1]))
+    sub_df['Team2'] = sub_df['ID'].map(lambda x: int(x.split('_')[2]))
+    sub_df = sub_df.merge(ratings[['Season','TID','Rating']],how='left',
+                                        left_on = ['Season','Team1'], right_on = ['Season','TID'])
+    sub_df = sub_df.merge(ratings[['Season','TID','Rating']],how='left',
+                                        left_on = ['Season','Team2'], right_on = ['Season','TID'],
+                                       suffixes=['W','L'])
+    sub_df['Pred'] = 1/(1+10**((sub_df['RatingL']-sub_df['RatingW'])/ 400))
+    sub_df[['ID', 'Pred']].to_csv('submission.csv', index=False)
+    print(sub_df[['ID', 'Pred']].head())
+    return
 
 
 
@@ -133,6 +150,8 @@ def run_history():
 
 if __name__ == "__main__":
     run_history()
+
+    create_submission()
 
 
 
