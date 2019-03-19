@@ -7,11 +7,18 @@ from game import Game
 
 from tqdm import tqdm
 
-df = pd.read_csv('../data/RegularSeasonDetailedResults.csv')
+sdf = pd.read_csv('../data/RegularSeasonDetailedResults.csv')
+tdf = pd.read_csv('../data/Stage2/NCAATourneyDetailedResults.csv')
+
+sdf['S'] = 1
+tdf['S'] = 0
+
+df = pd.concat([sdf,tdf])
+
+df = df.reset_index(drop=True)
+df = df.sort_values(by='DayNum')
 
 # df = pd.concat([sdf, tdf])
-df = df[df.Season >= 2014]
-df = df.reset_index()
 seasons = df.Season.unique()
 
 # need rolling strength of schedule ratings
@@ -39,6 +46,7 @@ def add_error(day, games, team_directory):
 
 
 rating_log = []
+
 for season in tqdm(seasons):
 
     sdf = df.loc[df['Season']==season]
@@ -97,21 +105,24 @@ for season in tqdm(seasons):
         team_directory[wteam] = team1
         team_directory[lteam] = team2
 
-        rl_team_1 = [season, row['DayNum'], team1.tid, team1.elo]
-        rl_team_2 = [season, row['DayNum'], team2.tid, team2.elo]
+        rl_team_1 = [season, row['DayNum'], team1.tid, team1.elo, team1.relo]
+        rl_team_2 = [season, row['DayNum'], team2.tid, team2.elo, team2.relo]
         rating_log.append(rl_team_1)
         rating_log.append(rl_team_2)
 
-rating_df = pd.DataFrame(rating_log, columns=['Season', 'DayNum', 'WTeamID', 'WElo'])
+rating_df = pd.DataFrame(rating_log, columns=['Season', 'DayNum', 'TeamID', 'Elo', 'Relo'])
+rating_df.to_csv('../regression/elo_ratings.csv')
+
 df = pd.merge(left=df,right=rating_df, on=['Season', 'DayNum', 'WTeamID'])
 rating_df = rating_df.rename(columns={
     'WTeamID':'LTeamID',
-    'WElo':'LElo'
+    'WElo':'LElo',
+    'WRelo':'LRelo'
 })
 df = pd.merge(left=df,right=rating_df, on=['Season', 'DayNum', 'LTeamID'])
 
 df = df.reset_index(drop=True)
-print(df.tail())
+
 
 wcols = list(df)
 lcols = list(df)
@@ -229,7 +240,8 @@ calendar_df = pd.DataFrame(calendar, columns=['Season', 'DayNum', 'OppTeamID', '
 
 df = df[['Season', 'DayNum', 'OppTeamID', 'Ast', 'Blk', 'DR', 'FGA', 'FGA3', 'FGM', 'FGM3', 'FTA', 'FTM', 'Loc', 'NumOT', 'OR', 'OppAst',
 'OppBlk', 'OppDR', 'OppFGA', 'OppFGA3', 'OppFGM', 'OppFGM3', 'OppFTA', 'OppFTM', 'OppOR', 'OppPF', 'OppScore', 'OppStl', 'OppTO', 'PF',
-'Result', 'Score', 'Stl', 'TO', 'TeamID', 'SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'BC', 'BCA', 'Disrupt', 'DisruptA', 'Elo', 'OppElo']]
+'Result', 'Score', 'Stl', 'TO', 'TeamID', 'SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'BC', 'BCA', 'Disrupt', 'DisruptA',
+'Elo', 'OppElo', 'Relo', 'OppRelo']]
 
 df = pd.merge(left=df, right=calendar_df, left_on=['Season', 'DayNum','OppTeamID'], right_on=['Season', 'DayNum','OppTeamID'])
 # get adj
@@ -263,15 +275,15 @@ loc_map = {
 }
 df.loc[:,'Loc'] = df['Loc'].apply(lambda x: loc_to_int(x))
 
-trn_input = df.groupby(['Season','TeamID'])['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo'].last().reset_index()
+trn_input = df.groupby(['Season','TeamID'])['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo', 'Relo'].last().reset_index()
 print(list(trn_input))
 trn_input.to_csv('./trn_input.csv')
 
-df[['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo']] = df.groupby('TeamID')['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo'].shift()
-df[['OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR', 'OppElo']] = df.groupby('TeamID')['OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR','OppElo'].shift()
+df[['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo', 'Relo']] = df.groupby('TeamID')['SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo', 'Relo'].shift()
+df[['OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR', 'OppElo', 'OppRelo']] = df.groupby('TeamID')['OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR','OppElo','OppRelo'].shift()
 
-model_input = df[['Season', 'DayNum', 'TeamID', 'Loc', 'SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo',
-'OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR', 'OppElo','Result']]
+model_input = df[['Season', 'DayNum', 'TeamID', 'Loc', 'SeaORtg', 'SeaDRtg', 'SeaOSR', 'SeaDSR', 'Elo', 'Relo',
+'OppSeaORtg', 'OppSeaDRtg', 'OppSeaOSR', 'OppSeaDSR', 'OppElo', 'OppRelo', 'Result']]
 
 model_input = model_input[model_input.DayNum >= 0]
 

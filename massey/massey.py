@@ -116,6 +116,10 @@ for season in tqdm(seasons):
         right_on=['RankingDayNum'], left_by=['LTeamID', 'Season'], right_by=['TeamID', 'Season'],
         allow_exact_matches=False, suffixes=['W', 'L'])
 
+        # print(list(sea_df))
+        # days_since_rank =
+        # raise ValueError
+
         sea_df['WRating'] = 100-4*np.log(sea_df['OrdinalRankW']+1)-sea_df['OrdinalRankW']/22
         sea_df['LRating'] = 100-4*np.log(sea_df['OrdinalRankL']+1)-sea_df['OrdinalRankL']/22
         sea_df['Prob'] = 1/(1+10**((sea_df['LRating']-sea_df['WRating'])/15))

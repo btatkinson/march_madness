@@ -2,3 +2,7 @@ data
 rate/submission.csv
 massey/submission.csv
 rate/rate.csv
+timeseries/team_files
+timeseries
+regression/master.csv
+regression/elo_ratings.csv
