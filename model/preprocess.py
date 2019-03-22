@@ -86,13 +86,14 @@ def fix_scd(scd,season):
 # load all data you can
 def add_everything(df):
     tc = pd.read_csv('../data/Stage2/TeamConferences.csv')
+    tc['ConfAbbrev'] = tc['ConfAbbrev'].replace('aac','big_east')
+    tc['ConfAbbrev'] = tc['ConfAbbrev'].replace('pac_ten','pac_twelve')
     df = pd.merge(left=df,right=tc,left_on=['Season', 'WTeamID'],right_on=['Season','TeamID'])
     df = pd.merge(left=df,right=tc,left_on=['Season', 'LTeamID'],right_on=['Season','TeamID'],
     suffixes=['W','L'])
     df = df.drop(columns=['TeamIDW','TeamIDL'])
 
     ts = pd.read_csv('../data/Stage2/TeamSpellings.csv',encoding="ISO-8859-1")
-
     seasons = [2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019]
     cd = None
     for season in seasons:
@@ -108,7 +109,6 @@ def add_everything(df):
 
     cd = cd.drop(columns=['TeamNameSpelling','Conf'])
     cd = cd.sort_values(by='Season')
-    print(len(df))
     df = pd.merge(left=df,right=cd,left_on=['Season','WTeamID'],right_on=['Season','TeamID'])
     df = pd.merge(left=df,right=cd,left_on=['Season','LTeamID'],right_on=['Season','TeamID'],suffixes=['W','L'])
     df = df.drop_duplicates()
@@ -134,6 +134,10 @@ tdf = pd.read_csv('../data/Stage2/NCAATourneyDetailedResults.csv')
 
 sdf = add_everything(sdf)
 tdf = add_everything(tdf)
+
+sdf = pd.concat([sdf,tdf])
+
+tdf = None
 
 def one_per_line(df):
     wcols = list(df)
@@ -206,7 +210,7 @@ def one_per_line(df):
 print(len(sdf))
 sdf = one_per_line(sdf)
 sdf = sdf.drop_duplicates()
-tdf = one_per_line(tdf)
+# tdf = one_per_line(tdf)
 print(len(sdf))
 elo_ratings = pd.read_csv('../data/elo_ratings.csv')
 elo_ratings = elo_ratings.drop(columns=['Relo'])
@@ -219,5 +223,19 @@ sdf = pd.merge(left=sdf,right=elo_ratings,on=['Season', 'DayNum', 'OppTeamID'])
 
 sdf = sdf.drop(columns=['Unnamed: 0_x','Unnamed: 0_y'])
 
+def loc2int(x):
+    return loc_map[x]
+
+loc_map = {
+    'H':1,
+    'A':0,
+    'N':0.5
+}
+sdf['Loc'] = sdf['Loc'].apply(lambda x: loc2int(x))
+# tdf['Loc'] = tdf['Loc'].apply(lambda x: loc2int(x))
+
+sdf = sdf.fillna(0)
+# tdf = tdf.fillna(0)
+
 sdf.to_csv('./sdf_raw.csv',index=False)
-tdf.to_csv('./tdf_raw.csv',index=False)
+# tdf.to_csv('./tdf_raw.csv',index=False)
